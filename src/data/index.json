@@ -1,0 +1,42 @@
+{
+  "index": {
+    "good": {
+      "doc_freq": 1,
+      "postings": {
+        "1": {
+          "frequency": 1,
+          "positions": [
+            5
+          ]
+        }
+      }
+    },
+    "friends": {
+      "doc_freq": 1,
+      "postings": {
+        "1": {
+          "frequency": 1,
+          "positions": [
+            6
+          ]
+        }
+      }
+    },
+    "indifference": {
+      "doc_freq": 1,
+      "postings": {
+        "1": {
+          "frequency": 1,
+          "positions": [
+            8
+          ]
+        }
+      }
+    }
+  },
+  "documents": {
+    "1": {
+      "url": "https://quotes.toscrape.com/"
+    }
+  }
+}
