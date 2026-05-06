@@ -14,7 +14,7 @@ def test_print_help_displays_available_commands(capsys) -> None:
     assert "build" in captured.out
     assert "load" in captured.out
     assert "print <word>" in captured.out
-    assert "find <words...>" in captured.out
+    assert 'find <words...> ["phrase"]' in captured.out
     assert "exit" in captured.out
 
 
@@ -181,7 +181,7 @@ def test_handle_find_command_validates_query_arguments(capsys) -> None:
 
     captured = capsys.readouterr()
 
-    assert "Usage: find <word1> [word2] [word3] ..." in captured.out
+    assert 'Usage: find <word1> [word2] ["exact phrase"] ...' in captured.out
 
 
 # handle_find_command should report when no pages match.
@@ -203,12 +203,12 @@ def test_handle_find_command_displays_matching_pages(capsys) -> None:
     search_engine.find.return_value = [
         {
             "doc_id": "2",
-            "score": "5",
+            "score": "5.0000",
             "url": "https://example.com/page2",
         },
         {
             "doc_id": "1",
-            "score": "3",
+            "score": "3.0000",
             "url": "https://example.com/page1",
         },
     ]
@@ -218,5 +218,24 @@ def test_handle_find_command_displays_matching_pages(capsys) -> None:
     captured = capsys.readouterr()
 
     assert "Matching pages:" in captured.out
-    assert "doc_id=2 score=5 url=https://example.com/page2" in captured.out
-    assert "doc_id=1 score=3 url=https://example.com/page1" in captured.out
+    assert "doc_id=2 score=5.0000 url=https://example.com/page2" in captured.out
+    assert "doc_id=1 score=3.0000 url=https://example.com/page1" in captured.out
+
+
+# handle_find_command should pass phrase-style arguments through unchanged.
+def test_handle_find_command_passes_phrase_arguments_to_search_engine(capsys) -> None:
+    search_engine = Mock()
+    search_engine.find.return_value = [
+        {
+            "doc_id": "1",
+            "score": "4.2500",
+            "url": "https://example.com/page1",
+        }
+    ]
+
+    main.handle_find_command(search_engine, ["good friends"])
+
+    captured = capsys.readouterr()
+
+    search_engine.find.assert_called_once_with(["good friends"])
+    assert "doc_id=1 score=4.2500 url=https://example.com/page1" in captured.out

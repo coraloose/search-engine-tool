@@ -1,4 +1,5 @@
 from pathlib import Path
+import shlex
 
 try:
     # Support package-style imports when running tests.
@@ -23,12 +24,12 @@ INDEX_FILE = DATA_DIR / "index.json"
 # Display the supported shell commands.
 def print_help() -> None:
     print("\nAvailable commands:")
-    print("  build               Crawl the site, build the index, and save it")
-    print("  load                Load the index from disk")
-    print("  print <word>        Print the inverted index entry for a word")
-    print("  find <words...>     Find pages containing all query words")
-    print("  help                Show this help message")
-    print("  exit                Quit the program\n")
+    print("  build                         Crawl the site, build the index, and save it")
+    print("  load                          Load the index from disk")
+    print("  print <word>                  Print the inverted index entry for a word")
+    print('  find <words...> ["phrase"]    Find pages containing all query terms')
+    print("  help                          Show this help message")
+    print("  exit                          Quit the program\n")
 
 
 # Crawl the site, build the index, and save it to disk.
@@ -90,7 +91,7 @@ def handle_find_command(search_engine: SearchEngine | None, args: list[str]) -> 
         return
 
     if not args:
-        print("Usage: find <word1> [word2] [word3] ...")
+        print('Usage: find <word1> [word2] ["exact phrase"] ...')
         return
 
     results = search_engine.find(args)
@@ -129,7 +130,12 @@ def main() -> None:
             print("Please enter a command.")
             continue
 
-        parts = raw_command.split()
+        try:
+            parts = shlex.split(raw_command)
+        except ValueError:
+            print("Invalid command syntax. Please check your quotation marks.")
+            continue
+
         command = parts[0].lower()
         args = parts[1:]
 
