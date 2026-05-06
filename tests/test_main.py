@@ -24,19 +24,19 @@ def test_print_help_displays_available_commands(capsys) -> None:
 def test_build_index_builds_and_saves_index(
     mock_crawler_class: Mock,
     mock_search_engine_class: Mock,
-    capsys
+    capsys,
 ) -> None:
     indexer = Mock()
     indexer.documents = {
-        1: {"url": "https://example.com/page1"}
+        1: {"url": "https://example.com/page1"},
     }
     indexer.index = {
-        "good": {"doc_freq": 1, "postings": {}}
+        "good": {"doc_freq": 1, "postings": {}},
     }
 
     mock_crawler = Mock()
     mock_crawler.crawl.return_value = [
-        {"url": "https://example.com/page1", "text": "good friends"}
+        {"url": "https://example.com/page1", "text": "good friends"},
     ]
     mock_crawler_class.return_value = mock_crawler
 
@@ -58,7 +58,10 @@ def test_build_index_builds_and_saves_index(
         [{"url": "https://example.com/page1", "text": "good friends"}]
     )
     indexer.save.assert_called_once_with(str(main.INDEX_FILE))
-    mock_search_engine_class.assert_called_once_with(indexer.index, indexer.documents)
+    mock_search_engine_class.assert_called_once_with(
+        indexer.index,
+        indexer.documents,
+    )
     assert result == mock_search_engine
 
 
@@ -81,14 +84,14 @@ def test_load_index_returns_none_when_index_file_is_missing(capsys) -> None:
 @patch("src.main.INDEX_FILE", new=Path(__file__))
 def test_load_index_loads_existing_index(
     mock_search_engine_class: Mock,
-    capsys
+    capsys,
 ) -> None:
     indexer = Mock()
     indexer.documents = {
-        1: {"url": "https://example.com/page1"}
+        1: {"url": "https://example.com/page1"},
     }
     indexer.index = {
-        "truth": {"doc_freq": 1, "postings": {}}
+        "truth": {"doc_freq": 1, "postings": {}},
     }
 
     mock_search_engine = Mock()
@@ -99,7 +102,10 @@ def test_load_index_loads_existing_index(
     captured = capsys.readouterr()
 
     indexer.load.assert_called_once_with(str(main.INDEX_FILE))
-    mock_search_engine_class.assert_called_once_with(indexer.index, indexer.documents)
+    mock_search_engine_class.assert_called_once_with(
+        indexer.index,
+        indexer.documents,
+    )
     assert "Index loaded from" in captured.out
     assert "Total documents indexed: 1" in captured.out
     assert "Total unique terms indexed: 1" in captured.out
@@ -146,7 +152,7 @@ def test_handle_print_command_displays_index_entry(capsys) -> None:
     search_engine = Mock()
     search_engine.print_word.return_value = {
         "doc_freq": 1,
-        "postings": {1: {"frequency": 2, "positions": [0, 3]}}
+        "postings": {1: {"frequency": 2, "positions": [0, 3]}},
     }
 
     main.handle_print_command(search_engine, ["Truth"])
