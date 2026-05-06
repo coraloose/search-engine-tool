@@ -1,30 +1,27 @@
 from pathlib import Path
 
 try:
-    # Package-style imports for pytest and module execution.
+    # Support package-style imports when running tests.
     from .crawler import Crawler
     from .indexer import Indexer
     from .search import SearchEngine
 except ImportError:
-    # Fallback imports for direct script execution: python main.py
+    # Support direct script execution with: python main.py
     from crawler import Crawler
     from indexer import Indexer
     from search import SearchEngine
 
+
 BASE_URL = "https://quotes.toscrape.com/"
 
-# Resolve paths relative to the project root rather than the current
-# working directory, so the program behaves consistently no matter
-# where it is launched from.
+# Resolve paths from the project root so the program behaves consistently.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 INDEX_FILE = DATA_DIR / "index.json"
 
 
+# Display the supported shell commands.
 def print_help() -> None:
-    """
-    Display the list of supported shell commands.
-    """
     print("\nAvailable commands:")
     print("  build               Crawl the site, build the index, and save it")
     print("  load                Load the index from disk")
@@ -34,16 +31,8 @@ def print_help() -> None:
     print("  exit                Quit the program\n")
 
 
+# Crawl the site, build the index, and save it to disk.
 def build_index(indexer: Indexer) -> SearchEngine:
-    """
-    Crawl the target website, build the inverted index, and save it to disk.
-
-    Args:
-        indexer: The indexer instance used to construct and persist the index.
-
-    Returns:
-        A SearchEngine instance initialised with the newly built index.
-    """
     print("Building index...")
     crawler = Crawler(BASE_URL, delay=6)
     pages = crawler.crawl()
@@ -58,16 +47,8 @@ def build_index(indexer: Indexer) -> SearchEngine:
     return SearchEngine(indexer.index, indexer.documents)
 
 
+# Load a saved index from disk.
 def load_index(indexer: Indexer) -> SearchEngine | None:
-    """
-    Load a previously saved index from disk.
-
-    Args:
-        indexer: The indexer instance used to load the stored index.
-
-    Returns:
-        A SearchEngine instance if loading succeeds, otherwise None.
-    """
     if not INDEX_FILE.exists():
         print(f"Index file not found: {INDEX_FILE}")
         print("Please run 'build' first.")
@@ -81,15 +62,8 @@ def load_index(indexer: Indexer) -> SearchEngine | None:
     return SearchEngine(indexer.index, indexer.documents)
 
 
+# Handle the print command.
 def handle_print_command(search_engine: SearchEngine | None, args: list[str]) -> None:
-    """
-    Process the 'print' command.
-
-    Args:
-        search_engine: The active search engine instance, or None if the
-            index has not yet been built or loaded.
-        args: Command arguments supplied by the user.
-    """
     if search_engine is None:
         print("Please run 'build' or 'load' first.")
         return
@@ -109,15 +83,8 @@ def handle_print_command(search_engine: SearchEngine | None, args: list[str]) ->
     print(result)
 
 
+# Handle the find command.
 def handle_find_command(search_engine: SearchEngine | None, args: list[str]) -> None:
-    """
-    Process the 'find' command.
-
-    Args:
-        search_engine: The active search engine instance, or None if the
-            index has not yet been built or loaded.
-        args: Command arguments supplied by the user.
-    """
     if search_engine is None:
         print("Please run 'build' or 'load' first.")
         return
@@ -141,10 +108,8 @@ def handle_find_command(search_engine: SearchEngine | None, args: list[str]) -> 
         )
 
 
+# Run the interactive command-line shell.
 def main() -> None:
-    """
-    Run the command-line shell for the search engine tool.
-    """
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     indexer = Indexer()

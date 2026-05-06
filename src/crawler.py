@@ -1,6 +1,5 @@
 import time
-from dataclasses import dataclass
-from typing import List, Optional, Set
+from typing import Optional, Set
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -8,43 +7,9 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag
 
 
-@dataclass
-class CrawledPage:
-    """
-    Represents a single crawled webpage.
-
-    Attributes:
-        url: The absolute URL of the crawled page.
-        text: The extracted searchable text content from the page.
-    """
-    url: str
-    text: str
-
-
 class Crawler:
-    """
-    Crawls pages from the target website and extracts searchable text.
-
-    This crawler is designed specifically for the coursework target website:
-    https://quotes.toscrape.com/
-
-    Main responsibilities:
-    1. Send HTTP requests to retrieve pages.
-    2. Respect a politeness delay between successive requests.
-    3. Extract quotes, authors, and tags from each page.
-    4. Follow pagination links to continue crawling.
-    5. Avoid revisiting pages that have already been crawled.
-    """
-
+    # Crawl the target website and extract searchable page text.
     def __init__(self, base_url: str, delay: int = 6, timeout: int = 15) -> None:
-        """
-        Initialise the crawler.
-
-        Args:
-            base_url: The starting URL for crawling.
-            delay: Minimum delay in seconds between consecutive requests.
-            timeout: Timeout in seconds for HTTP requests.
-        """
         self.base_url = base_url
         self.delay = delay
         self.timeout = timeout
@@ -52,7 +17,7 @@ class Crawler:
         self.visited_urls: Set[str] = set()
         self.last_request_time: Optional[float] = None
 
-        # A custom User-Agent is included to identify the client more clearly.
+        # Identify the crawler more clearly in outgoing requests.
         self.session.headers.update(
             {
                 "User-Agent": (
@@ -62,35 +27,19 @@ class Crawler:
             }
         )
 
+    # Respect the politeness delay between requests.
     def _wait_if_needed(self) -> None:
-        """
-        Enforce the politeness window between HTTP requests.
-
-        If a previous request was made less than `self.delay` seconds ago,
-        the crawler waits for the remaining time before making the next request.
-        """
         if self.last_request_time is None:
             return
 
-        elapsed_time = time.time() - self.last_request_time
-        remaining_delay = self.delay - elapsed_time
+        elapsed = time.time() - self.last_request_time
+        remaining = self.delay - elapsed
 
-        if remaining_delay > 0:
-            time.sleep(remaining_delay)
+        if remaining > 0:
+            time.sleep(remaining)
 
+    # Fetch one page and return its HTML content.
     def fetch_page(self, url: str) -> Optional[str]:
-        """
-        Retrieve the HTML content of a webpage.
-
-        This method respects the configured politeness delay before sending
-        a request. If the request fails for any reason, None is returned.
-
-        Args:
-            url: The absolute URL to request.
-
-        Returns:
-            The HTML content as a string if successful, otherwise None.
-        """
         self._wait_if_needed()
 
         try:
@@ -102,25 +51,10 @@ class Crawler:
             print(f"Failed to fetch {url}: {exc}")
             return None
 
+    # Extract quote text, author names, and tags from a page.
     def extract_page_text(self, html: str) -> str:
-        """
-        Extract searchable text from a page.
-
-        For the target website, the most relevant searchable content includes:
-        - quote text
-        - author names
-        - quote tags
-
-        These fields are concatenated into a single plain-text string.
-
-        Args:
-            html: The raw HTML content of the page.
-
-        Returns:
-            A single string containing the extracted textual content.
-        """
         soup = BeautifulSoup(html, "html.parser")
-        text_parts: List[str] = []
+        text_parts: list[str] = []
 
         quote_blocks = soup.find_all("div", class_="quote")
 
@@ -128,41 +62,32 @@ class Crawler:
             if not isinstance(quote_block, Tag):
                 continue
 
-            quote_text_element = quote_block.find("span", class_="text")
-            author_element = quote_block.find("small", class_="author")
-            tag_elements = quote_block.find_all("a", class_="tag")
+            quote_text = quote_block.find("span", class_="text")
+            author = quote_block.find("small", class_="author")
+            tags = quote_block.find_all("a", class_="tag")
 
-            if quote_text_element and quote_text_element.get_text(strip=True):
-                text_parts.append(quote_text_element.get_text(strip=True))
+            if quote_text and quote_text.get_text(strip=True):
+                text_parts.append(quote_text.get_text(strip=True))
 
-            if author_element and author_element.get_text(strip=True):
-                text_parts.append(author_element.get_text(strip=True))
+            if author and author.get_text(strip=True):
+                text_parts.append(author.get_text(strip=True))
 
-            for tag_element in tag_elements:
-                tag_text = tag_element.get_text(strip=True)
+            for tag in tags:
+                tag_text = tag.get_text(strip=True)
                 if tag_text:
                     text_parts.append(tag_text)
 
         return " ".join(text_parts)
 
+    # Return the next-page URL if pagination continues.
     def find_next_page_url(self, html: str, current_url: str) -> Optional[str]:
-        """
-        Identify the URL of the next page in the pagination sequence.
-
-        Args:
-            html: The raw HTML content of the current page.
-            current_url: The absolute URL of the current page.
-
-        Returns:
-            The absolute URL of the next page if it exists, otherwise None.
-        """
         soup = BeautifulSoup(html, "html.parser")
 
-        next_li = soup.find("li", class_="next")
-        if not next_li or not isinstance(next_li, Tag):
+        next_item = soup.find("li", class_="next")
+        if not next_item or not isinstance(next_item, Tag):
             return None
 
-        next_link = next_li.find("a")
+        next_link = next_item.find("a")
         if not next_link or not isinstance(next_link, Tag):
             return None
 
@@ -172,38 +97,15 @@ class Crawler:
 
         return urljoin(current_url, href)
 
+    # Check whether a URL belongs to the target domain.
     def is_valid_url(self, url: str) -> bool:
-        """
-        Determine whether a URL should be crawled.
-
-        Only URLs from the same domain as the base URL are considered valid.
-
-        Args:
-            url: The URL to validate.
-
-        Returns:
-            True if the URL is valid for crawling, otherwise False.
-        """
         base_netloc = urlparse(self.base_url).netloc
         candidate_netloc = urlparse(url).netloc
         return candidate_netloc == base_netloc
 
-    def crawl(self) -> List[dict]:
-        """
-        Crawl the target website starting from the base URL.
-
-        The crawler follows pagination links until no further pages are found.
-        Each successfully crawled page is returned as a dictionary containing
-        its URL and extracted text.
-
-        Returns:
-            A list of dictionaries in the form:
-            [
-                {"url": "...", "text": "..."},
-                ...
-            ]
-        """
-        pages: List[dict] = []
+    # Crawl all reachable pages starting from the base URL.
+    def crawl(self) -> list[dict[str, str]]:
+        pages: list[dict[str, str]] = []
         current_url: Optional[str] = self.base_url
 
         while current_url:
@@ -222,12 +124,7 @@ class Crawler:
                 break
 
             page_text = self.extract_page_text(html)
-            pages.append(
-                {
-                    "url": current_url,
-                    "text": page_text,
-                }
-            )
+            pages.append({"url": current_url, "text": page_text})
 
             current_url = self.find_next_page_url(html, current_url)
 
