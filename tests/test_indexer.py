@@ -130,3 +130,25 @@ def test_tokenize_returns_empty_list_for_empty_text() -> None:
     tokens = indexer.tokenize("")
 
     assert tokens == []
+
+
+# Tokenisation should normalise accents and curly apostrophes.
+def test_tokenize_handles_accents_and_curly_apostrophes() -> None:
+    indexer = Indexer()
+
+    tokens = indexer.tokenize("André said you’re doing fine.")
+
+    assert tokens == ["andre", "said", "you're", "doing", "fine"]
+
+
+# Tokenisation should keep valid unusual words rather than over-correcting them.
+def test_tokenize_keeps_valid_words_after_normalisation() -> None:
+    indexer = Indexer()
+
+    tokens = indexer.tokenize(
+        "Today you are You, that is truer than true. There is no one alive who is Youer than You."
+    )
+
+    assert "youer" in tokens
+    assert "truer" in tokens
+    assert "you" in tokens

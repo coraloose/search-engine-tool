@@ -1,5 +1,6 @@
 import json
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -10,9 +11,45 @@ class Indexer:
         self.index: dict[str, dict[str, Any]] = {}
         self.documents: dict[int, dict[str, str]] = {}
 
+    # Normalise text before tokenisation.
+    def _normalise_text(self, text: str) -> str:
+        text = text.lower()
+
+        # Replace common curly apostrophes and quotes with plain ASCII forms.
+        replacements = {
+            "’": "'",
+            "‘": "'",
+            "‛": "'",
+            "“": '"',
+            "”": '"',
+            "–": "-",
+            "—": "-",
+            "…": "...",
+            "\u00a0": " ",
+        }
+
+        for source, target in replacements.items():
+            text = text.replace(source, target)
+
+        # Convert accented characters to their base form.
+        text = unicodedata.normalize("NFKD", text)
+        text = "".join(
+            character
+            for character in text
+            if not unicodedata.combining(character)
+        )
+
+        # Normalise repeated whitespace.
+        text = re.sub(r"\s+", " ", text).strip()
+
+        return text
+
     # Convert raw text into lowercase searchable tokens.
     def tokenize(self, text: str) -> list[str]:
-        return re.findall(r"[a-zA-Z']+", text.lower())
+        normalised_text = self._normalise_text(text)
+
+        # Keep words with internal apostrophes, such as "it's" or "you're".
+        return re.findall(r"[a-z]+(?:'[a-z]+)*", normalised_text)
 
     # Add one document and its tokens to the inverted index.
     def add_document(self, doc_id: int, url: str, text: str) -> None:
