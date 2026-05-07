@@ -4,17 +4,17 @@
 
 This project is a Python command-line search engine developed for the COMP3011 Web Services and Web Data coursework.
 
-The application crawls the target website `https://quotes.toscrape.com/`, extracts searchable content from each page, builds an inverted index, stores the index in the file system, and allows users to search for words and multi-word queries through a command-line interface.
+The application crawls the target website `https://quotes.toscrape.com/`, extracts searchable content from each page, builds an inverted index, saves the index to disk, and allows users to search for words, multi-word queries, and exact phrases through a command-line interface.
 
-The system is designed to demonstrate the core stages of a simple search engine pipeline:
+The system demonstrates the core stages of a simple search engine pipeline:
 
 - web crawling
 - text extraction
 - inverted index construction
 - index persistence
-- query processing and retrieval
+- ranked query processing and retrieval
 
-The search is case-insensitive and stores word statistics such as document frequency, term frequency, and word positions.
+The search is case-insensitive, and the index stores word statistics such as document frequency, term frequency, and word positions.
 
 ---
 
@@ -29,8 +29,11 @@ The search is case-insensitive and stores word statistics such as document frequ
   - word positions
 - Saves the index to a JSON file
 - Loads the saved index from disk
-- Supports single-word and multi-word search queries
-- Supports printing the inverted index entry for a specific word
+- Supports single-word and multi-word AND queries
+- Supports exact phrase search using quotation marks
+- Ranks results using TF-IDF scoring
+- Applies a phrase-match bonus to exact phrase queries
+- Prints the inverted index entry for a specific word
 - Includes automated tests for crawler, indexer, search, and command handling
 
 ---
@@ -94,7 +97,7 @@ pip install -r requirements.txt
 
 ### 3. Run the application
 
-You can run the command-line tool from the `src` directory:
+Run the command-line tool from the `src` directory:
 
 ```bash
 cd src
@@ -117,7 +120,7 @@ Crawls the target website, builds the inverted index, and saves it to disk.
 
 ### `load`
 
-Loads a previously saved index from the file system.
+Loads a previously saved index from disk.
 
 ```text
 > load
@@ -138,21 +141,29 @@ Inverted index for 'truth':
 {'doc_freq': 5, 'postings': {2: {'frequency': 1, 'positions': [19]}, ...}}
 ```
 
-### `find <word1> [word2] [word3] ...`
+### `find <words...> ["exact phrase"]`
 
-Finds all pages containing the given query word or words.
+Returns all pages containing all query terms, with results ranked by TF-IDF score.
 
 ```text
 > find life
 > find good friends
 ```
 
-Example output:
+### `find "exact phrase"`
+
+Finds only pages containing the exact quoted phrase.
 
 ```text
-Matching pages:
-- doc_id=2 score=11 url=https://quotes.toscrape.com/page/2/
-- doc_id=6 score=3 url=https://quotes.toscrape.com/page/6/
+> find "good friends"
+```
+
+### `find <word> "exact phrase"`
+
+Supports mixed keyword and phrase queries.
+
+```text
+> find life "good friends"
 ```
 
 ### `help`
@@ -173,6 +184,64 @@ Quits the program.
 
 ---
 
+## Example Workflow
+
+A typical usage session looks like this:
+
+```text
+> build
+> print truth
+> find good friends
+> find "good friends"
+> find life
+> load
+> exit
+```
+
+---
+
+## Architecture Overview
+
+The project is organised into four main modules:
+
+### `crawler.py`
+
+Responsible for:
+
+- sending HTTP requests
+- respecting the politeness delay
+- extracting quote text, author names, and tags
+- following pagination links across the target website
+
+### `indexer.py`
+
+Responsible for:
+
+- normalising and tokenising text
+- building the inverted index
+- storing document metadata
+- saving and loading index data as JSON
+
+### `search.py`
+
+Responsible for:
+
+- retrieving postings for query terms
+- processing single-word, multi-word, and phrase queries
+- computing TF-IDF ranking scores
+- checking positional adjacency for exact phrase matching
+
+### `main.py`
+
+Responsible for:
+
+- the interactive command-line shell
+- parsing user commands
+- calling build, load, print, and find operations
+- handling invalid input and command errors gracefully
+
+---
+
 ## How the System Works
 
 ### Crawling
@@ -180,6 +249,7 @@ Quits the program.
 The crawler starts from the homepage of `https://quotes.toscrape.com/` and follows pagination links until no further pages are available.
 
 It extracts:
+
 - quote text
 - author names
 - tags
@@ -188,27 +258,87 @@ The crawler uses a politeness delay of at least 6 seconds between successive req
 
 ### Indexing
 
-The indexer tokenises extracted text into lowercase words and builds an inverted index.
+The indexer tokenises extracted text into lowercase searchable words and builds an inverted index.
 
 For each word, the index stores:
+
 - `doc_freq`: number of documents containing the word
 - `postings`: document-level information, including:
   - `frequency`
   - `positions`
 
+The tokenizer also normalises accented characters and curly apostrophes so that tokens are stored more consistently.
+
 ### Search
 
 The search engine supports:
+
 - single-word queries
-- multi-word queries using an AND-based search model
+- multi-word AND queries
+- exact phrase queries using quotation marks
+- mixed keyword and phrase queries
 
-For multi-word queries, only documents containing all query terms are returned.
+Results are ranked using TF-IDF scoring rather than simple raw term frequency.
 
-Results are ranked using a simple relevance score based on the sum of term frequencies of the query words in each matching document.
+For exact phrase queries, the engine also checks whether the words occur in adjacent positions within the same document and applies a phrase-match bonus to improve ranking quality.
 
 ---
 
-## Testing
+## Ranking Strategy
+
+### Baseline idea
+
+A simple ranking strategy would be to sort documents by raw term frequency. This is easy to implement, but it can overvalue very common words.
+
+### Current approach: TF-IDF
+
+This project uses TF-IDF-inspired ranking:
+
+- **TF (term frequency)** measures how often a word appears in a document
+- **IDF (inverse document frequency)** gives more weight to rarer terms
+- the final score is the sum of weighted term contributions across the query
+
+This makes ranking more meaningful because rare but important words contribute more strongly than very common words.
+
+### Phrase bonus
+
+For exact phrase queries, the engine applies an additional phrase-match bonus when the phrase appears contiguously in a document. This helps exact phrase matches rank above documents that merely contain the same individual terms.
+
+---
+
+## Design Decisions
+
+### Why an inverted index?
+
+An inverted index allows efficient lookup of words and documents. Instead of scanning every page for every query, the system can directly retrieve the postings list for each query term.
+
+### Why store positions?
+
+Storing positions makes it possible to:
+
+- record richer term statistics
+- support phrase matching
+- extend the system more easily for future proximity-based features
+
+### Why use JSON for persistence?
+
+JSON is simple, readable, easy to debug, and suitable for storing the entire index in a single file, which matches the coursework brief.
+
+### Why is search case-insensitive?
+
+The coursework specifies that search should not be case-sensitive, so all tokens are normalised to lowercase during indexing and querying.
+
+### Why add TF-IDF and phrase search?
+
+These features extend the basic coursework requirements and make the search behaviour more realistic:
+
+- TF-IDF improves ranking quality
+- phrase search improves retrieval precision
+- both features are directly supported by the positional inverted index design
+
+---
+
+## Testing Strategy
 
 This project includes automated tests for all core components:
 
@@ -216,6 +346,19 @@ This project includes automated tests for all core components:
 - indexer
 - search
 - command handling in `main.py`
+
+The test suite covers:
+
+- successful and failed page fetching
+- pagination handling
+- tokenisation behaviour
+- inverted index construction
+- build/load persistence
+- single-word and multi-word search
+- TF-IDF ranking behaviour
+- exact phrase matching
+- command parsing and shell interaction
+- edge cases such as empty input, invalid quotes, and missing query terms
 
 ### Run all tests
 
@@ -229,69 +372,57 @@ pytest -v
 pytest --cov=src --cov-report=term-missing
 ```
 
-### Current test coverage
+### Current coverage
 
-At the current stage of development, the project achieves approximately 80% overall coverage across the `src` package.
-
----
-
-## Example Workflow
-
-A typical usage session looks like this:
-
-```text
-> build
-> print truth
-> find life
-> find good friends
-> load
-> exit
-```
-
----
-
-## Design Decisions
-
-### Why an inverted index?
-
-An inverted index allows efficient lookup of words and documents.  
-Instead of scanning every page for every query, the system can directly retrieve the postings list for each query term.
-
-### Why store positions?
-
-Storing positions provides more detailed statistics about where words occur in a page. It also makes the design easier to extend in the future for phrase queries or proximity-based ranking.
-
-### Why use JSON for persistence?
-
-JSON is simple, readable, easy to debug, and suitable for storing the entire index in a single file, which matches the coursework brief.
-
-### Why is search case-insensitive?
-
-The coursework specifies that search should not be case-sensitive, so all tokens are normalised to lowercase during indexing and querying.
+The current test suite achieves **92% total coverage** across the `src` package.
 
 ---
 
 ## Error Handling
 
-The application includes basic error handling for:
+The application includes error handling for:
 
 - failed HTTP requests
 - missing index files
-- empty user commands
 - invalid command usage
-- empty or unmatched queries
+- empty user commands
+- invalid quotation syntax in the CLI
+- unmatched or missing queries
+- build and load failures in the command loop
 
 ---
 
-## Future Improvements
+## Performance Notes
+
+This project is designed for correctness and clarity rather than large-scale optimisation, but the implementation still uses efficient structures for this coursework scenario.
+
+- **Index building** is roughly proportional to the total number of tokens processed.
+- **Keyword search** is based on postings-list intersection for AND-style matching.
+- **Phrase search** is more expensive than keyword search because it also checks positional adjacency.
+- **TF-IDF ranking** adds additional score computation per matching document, but remains efficient for the small course dataset.
+
+For this coursework dataset, the performance is sufficient for interactive command-line use.
+
+---
+
+## Limitations and Future Improvements
+
+Current limitations include:
+
+- no stemming or lemmatisation
+- no stop-word filtering
+- no snippet generation in search results
+- phrase search is exact and order-sensitive
+- the index is stored in a single JSON file rather than a more scalable storage backend
 
 Possible future improvements include:
 
-- TF-IDF ranking instead of simple term-frequency scoring
-- phrase search using word positions
-- stop-word filtering
-- stemming or lemmatisation
-- exporting search results in a richer format
+- query suggestions or spelling correction
+- Boolean query operators
+- snippet previews for matched results
+- stop-word removal and stemming
+- proximity ranking beyond exact phrase matching
+- alternative storage backends for larger datasets
 
 ---
 
@@ -303,5 +434,8 @@ Created for COMP3011 Web Services and Web Data coursework.
 
 ## GenAI Usage Note
 
-Generative AI tools were used during development as support tools for drafting code structure, refining tests, and reviewing design decisions.  
+Generative AI tools were used during development as support tools for drafting code structure, refining tests, reviewing design decisions, and improving documentation.
+
 All generated suggestions were manually reviewed, tested, and adapted before inclusion in the final implementation.
+
+The final submitted code, tests, and design choices were verified and understood manually rather than accepted uncritically.
