@@ -267,3 +267,22 @@ def test_find_phrase_matches_receive_phrase_bonus() -> None:
     results = search_engine.find(["good friends"])
 
     assert results[0]["doc_id"] == "2"
+
+
+# Mixed keyword and phrase queries should require both conditions.
+def test_find_supports_mixed_keyword_and_phrase_query() -> None:
+    search_engine = build_search_engine()
+
+    results = search_engine.find(["life", "good friends"])
+
+    assert len(results) == 1
+    assert results[0]["doc_id"] == "1"
+
+
+# Blank or punctuation-only query parts should produce no matches.
+def test_find_returns_empty_list_for_blank_or_punctuation_only_query_parts() -> None:
+    search_engine = build_search_engine()
+
+    results = search_engine.find(["   ", "!!!"])
+
+    assert results == []

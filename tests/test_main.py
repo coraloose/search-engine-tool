@@ -239,3 +239,80 @@ def test_handle_find_command_passes_phrase_arguments_to_search_engine(capsys) ->
 
     search_engine.find.assert_called_once_with(["good friends"])
     assert "doc_id=1 score=4.2500 url=https://example.com/page1" in captured.out
+
+
+# The main loop should process help and exit commands.
+def test_main_handles_help_then_exit(tmp_path: Path, capsys) -> None:
+    with (
+        patch.object(main, "DATA_DIR", tmp_path),
+        patch("builtins.input", side_effect=["help", "exit"]),
+    ):
+        main.main()
+
+    captured = capsys.readouterr()
+
+    assert "Search Engine Tool" in captured.out
+    assert "Available commands:" in captured.out
+    assert "Goodbye." in captured.out
+
+
+# The main loop should reprompt on blank input and exit cleanly on EOF.
+def test_main_reprompts_on_empty_input_and_handles_eof(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    with (
+        patch.object(main, "DATA_DIR", tmp_path),
+        patch("builtins.input", side_effect=["", EOFError]),
+    ):
+        main.main()
+
+    captured = capsys.readouterr()
+
+    assert "Please enter a command." in captured.out
+    assert "Exiting." in captured.out
+
+
+# The main loop should report unknown commands.
+def test_main_reports_unknown_command(tmp_path: Path, capsys) -> None:
+    with (
+        patch.object(main, "DATA_DIR", tmp_path),
+        patch("builtins.input", side_effect=["unknown", "exit"]),
+    ):
+        main.main()
+
+    captured = capsys.readouterr()
+
+    assert "Unknown command: unknown" in captured.out
+    assert "Type 'help' to see available commands." in captured.out
+
+
+# The main loop should report invalid quotation syntax.
+def test_main_reports_invalid_quotation_syntax(tmp_path: Path, capsys) -> None:
+    with (
+        patch.object(main, "DATA_DIR", tmp_path),
+        patch("builtins.input", side_effect=['find "good friends', "exit"]),
+    ):
+        main.main()
+
+    captured = capsys.readouterr()
+
+    assert "Invalid command syntax. Please check your quotation marks." in captured.out
+    assert "Goodbye." in captured.out
+
+
+# The main loop should report build and load failures gracefully.
+def test_main_handles_build_and_load_exceptions(tmp_path: Path, capsys) -> None:
+    with (
+        patch.object(main, "DATA_DIR", tmp_path),
+        patch("builtins.input", side_effect=["build", "load", "exit"]),
+        patch("src.main.build_index", side_effect=Exception("build failed")),
+        patch("src.main.load_index", side_effect=Exception("load failed")),
+    ):
+        main.main()
+
+    captured = capsys.readouterr()
+
+    assert "An error occurred while building the index: build failed" in captured.out
+    assert "An error occurred while loading the index: load failed" in captured.out
+    assert "Goodbye." in captured.out

@@ -75,7 +75,7 @@ def test_find_next_page_url_returns_absolute_url() -> None:
 
     next_url = crawler.find_next_page_url(
         SAMPLE_HTML,
-        "https://quotes.toscrape.com/"
+        "https://quotes.toscrape.com/",
     )
 
     assert next_url == "https://quotes.toscrape.com/page/2/"
@@ -87,7 +87,7 @@ def test_find_next_page_url_returns_none_when_no_next_link_exists() -> None:
 
     next_url = crawler.find_next_page_url(
         LAST_PAGE_HTML,
-        "https://quotes.toscrape.com/page/10/"
+        "https://quotes.toscrape.com/page/10/",
     )
 
     assert next_url is None
@@ -147,3 +147,19 @@ def test_crawl_stops_when_fetch_fails(mock_fetch_page: Mock) -> None:
     pages = crawler.crawl()
 
     assert pages == []
+
+
+# The crawler should sleep when the politeness delay has not elapsed.
+@patch("src.crawler.time.sleep")
+@patch("src.crawler.time.time", return_value=12.0)
+def test_wait_if_needed_sleeps_when_delay_has_not_elapsed(
+    mock_time: Mock,
+    mock_sleep: Mock,
+) -> None:
+    crawler = Crawler("https://quotes.toscrape.com/", delay=6)
+    crawler.last_request_time = 10.0
+
+    crawler._wait_if_needed()
+
+    mock_time.assert_called_once()
+    mock_sleep.assert_called_once_with(4.0)
